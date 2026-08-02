@@ -4,9 +4,9 @@ import re
 import io
 import zipfile
 import requests
+import cloudscraper
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
-import pandas as pd
 
 # OCR & Translation Imports
 import easyocr
@@ -95,28 +95,25 @@ do_translation = st.checkbox("🤖 AI 한국어 이미지 번역 진행 (EasyOCR
 st.markdown("---")
 
 # -------------------------------------------------------------------
-# 이미지 수집 및 번역 실행 로직 (우회 강화 및 이스케이프 수정)
+# 이미지 수집 및 번역 실행 로직 (cloudscraper 적용)
 # -------------------------------------------------------------------
 def process_images(url, do_translate):
-    # 크롤링 차단 방지용 브라우저 헤더 보강
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-    }
+    # 클라우드플레어/보안 캡차 우회 세션 생성
+    scraper = cloudscraper.create_scraper(
+        browser={
+            'browser': 'chrome',
+            'platform': 'windows',
+            'desktop': True
+        }
+    )
 
-    st.text("🌐 웹페이지 소스 수집 중...")
-    response = requests.get(url, headers=headers, timeout=15)
+    st.text("🌐 웹페이지 소스 우회 수집 중...")
+    response = scraper.get(url, timeout=20)
     
     if response.status_code != 200:
         raise Exception(f"페이지 접속 불가 (상태 코드: {response.status_code})")
 
     raw_html = response.text
-
-    # 💡 [핵심] JSON 내 이스케이프 슬래시(\/) 제거 로직 추가
     raw_html = raw_html.replace('\\/', '/')
 
     # Hidden descUrl 추적
@@ -127,7 +124,7 @@ def process_images(url, do_translate):
         if desc_url.startswith('//'):
             desc_url = 'https:' + desc_url
         try:
-            desc_res = requests.get(desc_url, headers=headers, timeout=15)
+            desc_res = scraper.get(desc_url, timeout=15)
             if desc_res.status_code == 200:
                 detail_html = desc_res.text.replace('\\/', '/')
         except:
@@ -135,7 +132,7 @@ def process_images(url, do_translate):
 
     combined_html = raw_html + "\n" + detail_html
     
-    # 💡 이미지 정규식 유연화 (유형 확대)
+    # 이미지 정규식 추출
     pattern = r'(?:https?:)?//[^\s\'"<>]+?\.(?:jpg|jpeg|png|webp)'
     found_matches = re.findall(pattern, combined_html, re.IGNORECASE)
 
@@ -154,7 +151,7 @@ def process_images(url, do_translate):
             img_urls.append(img_url)
 
     if not img_urls:
-        raise Exception("이미지를 찾지 못했습니다. URL이 올바른지, 혹은 해당 상품 페이지가 캡차에 걸렸는지 확인해 주세요.")
+        raise Exception("이미지를 찾지 못했습니다. URL을 다시 확인해 주세요.")
 
     processed_images = []
     reader = get_ocr_reader() if do_translate else None
@@ -168,7 +165,7 @@ def process_images(url, do_translate):
     for idx, img_url in enumerate(img_urls[:total_target], start=1):
         status_text.text(f"📸 이미지 [{idx}/{total_target}] 수집 및 최적화 중...")
         try:
-            img_res = requests.get(img_url, headers=headers, timeout=10)
+            img_res = scraper.get(img_url, timeout=10)
             if img_res.status_code == 200 and len(img_res.content) > 5000:
                 img = Image.open(io.BytesIO(img_res.content)).convert("RGB")
                 img = img.resize((1000, 1000), Image.Resampling.LANCZOS)
@@ -208,7 +205,7 @@ def process_images(url, do_translate):
                 img.save(out_buffer, format="JPEG", quality=95)
                 processed_images.append((f"image_{len(processed_images)+1}.jpg", out_buffer.getvalue()))
 
-        except Exception as e:
+        except Exception:
             pass
 
         progress_bar.progress(idx / total_target)
@@ -217,6 +214,8 @@ def process_images(url, do_translate):
     return processed_images
 
 # 실행 버튼
+import pandas as pd
+
 if st.button("🚀 이미지 수집 및 처리 시작", type="primary", use_container_width=True):
     if not url:
         st.error("상품 URL을 입력해 주세요.")
