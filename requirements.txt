@@ -1,7 +1,8 @@
 streamlit
-requests
-pillow
-pandas
-openpyxl
 easyocr
 deep-translator
+Pillow
+pandas
+openpyxl
+requests
+cloudscraper
