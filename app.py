@@ -16,13 +16,13 @@ from deep_translator import GoogleTranslator
 # 페이지 기본 설정
 # -------------------------------------------------------------------
 st.set_page_config(
-    page_title="동화님의 쿠팡 자동 등록 지원 서비스_번역확인",
+    page_title="쿠팡 자동 등록 지원 서비스",
     page_icon="🚀",
     layout="centered"
 )
 
 # -------------------------------------------------------------------
-# EasyOCR 및 번역기 캐싱 (서버 메모리 절약 & 속도 향상)
+# EasyOCR 및 번역기 캐싱
 # -------------------------------------------------------------------
 @st.cache_resource
 def get_ocr_reader():
@@ -33,18 +33,17 @@ def get_translator():
     return GoogleTranslator(source='auto', target='ko')
 
 # -------------------------------------------------------------------
-# 사이드바: 관리자 인증 & 기본 설정
+# 사이드바: 관리자 인증
 # -------------------------------------------------------------------
 st.sidebar.title("🔒 관리자 인증")
-# 💡 여기서 사용할 비밀번호를 설정하세요!
-ADMIN_PASSWORD = "wnsclqkqh123" 
+ADMIN_PASSWORD = "admin" 
 
 user_pw = st.sidebar.text_input("접근 비밀번호를 입력하세요", type="password")
 
 if user_pw != ADMIN_PASSWORD:
-    st.title("🚀 동화님의 쿠팡 자동 등록 지원 도구")
+    st.title("🚀 쿠팡 자동 등록 지원 도구")
     st.warning("⚠️ 인증이 필요합니다. 사이드바에 올바른 비밀번호를 입력해 주세요.")
-    st.info("💡 기본 비밀번호는 `admin` 으로 설정되어 있습니다. (코드에서 변경 가능)")
+    st.info("💡 기본 비밀번호는 `admin` 으로 설정되어 있습니다.")
     st.stop()
 
 st.sidebar.success("✅ 인증 성공! 서비스를 이용할 수 있습니다.")
@@ -52,12 +51,12 @@ st.sidebar.success("✅ 인증 성공! 서비스를 이용할 수 있습니다."
 # -------------------------------------------------------------------
 # 메인 화면
 # -------------------------------------------------------------------
-st.title("🚀 쿠팡 자동 등록 지원 도구_번역확인")
+st.title("🚀 쿠팡 자동 등록 지원 도구")
 st.caption("해외 상품 크롤링, 1000x1000 최적화, AI 한국어 번역, 마진 계산기")
 
 st.markdown("---")
 
-# 1. 상품 정보 입력 Section
+# 1. 입력 영역
 st.subheader("1. 상품 정보 및 원가 입력")
 col1, col2 = st.columns([2, 1])
 
@@ -72,7 +71,7 @@ with col3:
 with col4:
     rate = st.number_input("적용 환율 (원)", min_value=1.0, value=1570.0, step=10.0)
 
-# 2. 마진 계산 Section
+# 2. 마진 계산
 st.subheader("2. 마진 및 수수료 설정")
 col5, col6 = st.columns(2)
 
@@ -81,7 +80,6 @@ with col5:
 with col6:
     fee_rate_input = st.number_input("쿠팡 수수료율 (%)", min_value=0.0, max_value=99.0, value=12.0, step=0.5)
 
-# 판매가 자동 계산
 fee_rate = fee_rate_input / 100.0
 if fee_rate < 1.0:
     target_price = int(round(((orig_price + shipping) * rate + margin) / (1.0 - fee_rate), -1))
@@ -90,27 +88,36 @@ else:
 
 st.info(f"💡 **예상 쿠팡 판매가:** `{target_price:,} 원`")
 
-# 3. AI 번역 옵션 선택
+# 3. 옵션 선택
 st.subheader("3. 이미지 처리 옵션")
 do_translation = st.checkbox("🤖 AI 한국어 이미지 번역 진행 (EasyOCR + Google)", value=True)
 
 st.markdown("---")
 
 # -------------------------------------------------------------------
-# 이미지 수집 및 번역 실행 로직
+# 이미지 수집 및 번역 실행 로직 (우회 강화 및 이스케이프 수정)
 # -------------------------------------------------------------------
 def process_images(url, do_translate):
+    # 크롤링 차단 방지용 브라우저 헤더 보강
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
     }
 
     st.text("🌐 웹페이지 소스 수집 중...")
     response = requests.get(url, headers=headers, timeout=15)
+    
     if response.status_code != 200:
-        raise Exception(f"페이지를 불러올 수 없습니다. (상태 코드: {response.status_code})")
+        raise Exception(f"페이지 접속 불가 (상태 코드: {response.status_code})")
 
     raw_html = response.text
+
+    # 💡 [핵심] JSON 내 이스케이프 슬래시(\/) 제거 로직 추가
+    raw_html = raw_html.replace('\\/', '/')
 
     # Hidden descUrl 추적
     desc_matches = re.findall(r'(?:https?:)?//(?:desc|win\.item|desc\.alicdn)[^\s\'"<>]+', raw_html)
@@ -122,11 +129,13 @@ def process_images(url, do_translate):
         try:
             desc_res = requests.get(desc_url, headers=headers, timeout=15)
             if desc_res.status_code == 200:
-                detail_html = desc_res.text
+                detail_html = desc_res.text.replace('\\/', '/')
         except:
             pass
 
     combined_html = raw_html + "\n" + detail_html
+    
+    # 💡 이미지 정규식 유연화 (유형 확대)
     pattern = r'(?:https?:)?//[^\s\'"<>]+?\.(?:jpg|jpeg|png|webp)'
     found_matches = re.findall(pattern, combined_html, re.IGNORECASE)
 
@@ -134,6 +143,7 @@ def process_images(url, do_translate):
     for img_url in found_matches:
         if img_url.startswith('//'):
             img_url = 'https:' + img_url
+            
         img_url = re.sub(r'_\d+x\d+.*$', '', img_url)
         img_url = re.sub(r'_\.webp$', '', img_url)
 
@@ -144,9 +154,9 @@ def process_images(url, do_translate):
             img_urls.append(img_url)
 
     if not img_urls:
-        raise Exception("이미지를 찾지 못했습니다.")
+        raise Exception("이미지를 찾지 못했습니다. URL이 올바른지, 혹은 해당 상품 페이지가 캡차에 걸렸는지 확인해 주세요.")
 
-    processed_images = [] # (filename, bytes_data)
+    processed_images = []
     reader = get_ocr_reader() if do_translate else None
     translator = get_translator() if do_translate else None
 
@@ -163,7 +173,6 @@ def process_images(url, do_translate):
                 img = Image.open(io.BytesIO(img_res.content)).convert("RGB")
                 img = img.resize((1000, 1000), Image.Resampling.LANCZOS)
 
-                # 번역 실행
                 if do_translate:
                     status_text.text(f"🎨 이미지 [{idx}/{total_target}] AI 한국어 번역 중...")
                     img_byte_arr = io.BytesIO()
@@ -173,8 +182,6 @@ def process_images(url, do_translate):
                     results = reader.readtext(img_bytes)
                     if results:
                         draw = ImageDraw.Draw(img)
-                        font_path = "C:\\Windows\\Fonts\\malgun.ttf"
-                        
                         for bbox, text, prob in results:
                             if prob < 0.35 or not text.strip():
                                 continue
@@ -194,10 +201,7 @@ def process_images(url, do_translate):
 
                             draw.rectangle([max(0, min_x-3), max(0, min_y-3), min(img.width, max_x+3), min(img.height, max_y+3)], fill=(255, 255, 255))
                             font_size = max(12, int(box_h * 0.75))
-                            try:
-                                font = ImageFont.truetype(font_path, font_size)
-                            except:
-                                font = ImageFont.load_default()
+                            font = ImageFont.load_default()
                             draw.text((min_x, min_y), trans_text, fill=(0, 0, 0), font=font)
 
                 out_buffer = io.BytesIO()
@@ -212,7 +216,7 @@ def process_images(url, do_translate):
     status_text.text("✅ 처리 완료!")
     return processed_images
 
-# 작업 시작 버튼
+# 실행 버튼
 if st.button("🚀 이미지 수집 및 처리 시작", type="primary", use_container_width=True):
     if not url:
         st.error("상품 URL을 입력해 주세요.")
@@ -224,13 +228,11 @@ if st.button("🚀 이미지 수집 및 처리 시작", type="primary", use_cont
             if images:
                 st.success(f"🎉 총 {len(images)}개의 이미지가 성공적으로 수집/처리되었습니다!")
 
-                # 1. ZIP 압축 파일 생성
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
                     for filename, data in images:
                         zf.writestr(filename, data)
                 
-                # 2. 엑셀 파일 생성
                 df = pd.DataFrame([{
                     "수집일시": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "상품URL": url,
