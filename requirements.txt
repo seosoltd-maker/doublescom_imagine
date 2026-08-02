@@ -1,0 +1,7 @@
+streamlit
+requests
+pillow
+pandas
+openpyxl
+easyocr
+deep-translator
