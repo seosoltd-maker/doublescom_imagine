@@ -16,7 +16,7 @@ from deep_translator import GoogleTranslator
 # 페이지 기본 설정
 # -------------------------------------------------------------------
 st.set_page_config(
-    page_title="쿠팡 자동 등록 지원 서비스",
+    page_title="동화님의 쿠팡 자동 등록 지원 서비스_번역확인",
     page_icon="🚀",
     layout="centered"
 )
@@ -37,12 +37,12 @@ def get_translator():
 # -------------------------------------------------------------------
 st.sidebar.title("🔒 관리자 인증")
 # 💡 여기서 사용할 비밀번호를 설정하세요!
-ADMIN_PASSWORD = "admin" 
+ADMIN_PASSWORD = "wnsclqkqh123" 
 
 user_pw = st.sidebar.text_input("접근 비밀번호를 입력하세요", type="password")
 
 if user_pw != ADMIN_PASSWORD:
-    st.title("🚀 쿠팡 자동 등록 지원 도구")
+    st.title("🚀 동화님의 쿠팡 자동 등록 지원 도구")
     st.warning("⚠️ 인증이 필요합니다. 사이드바에 올바른 비밀번호를 입력해 주세요.")
     st.info("💡 기본 비밀번호는 `admin` 으로 설정되어 있습니다. (코드에서 변경 가능)")
     st.stop()
@@ -52,7 +52,7 @@ st.sidebar.success("✅ 인증 성공! 서비스를 이용할 수 있습니다."
 # -------------------------------------------------------------------
 # 메인 화면
 # -------------------------------------------------------------------
-st.title("🚀 쿠팡 자동 등록 지원 도구")
+st.title("🚀 쿠팡 자동 등록 지원 도구_번역확인")
 st.caption("해외 상품 크롤링, 1000x1000 최적화, AI 한국어 번역, 마진 계산기")
 
 st.markdown("---")
